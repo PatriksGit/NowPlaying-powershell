@@ -1,0 +1,2 @@
+# Keep the script byte for byte as the mod ships it (CRLF), so Get-FileHash matches the game copy.
+*.ps1 -text
