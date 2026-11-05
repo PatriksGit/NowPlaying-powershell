@@ -2,7 +2,7 @@
 # it with Windows PowerShell 5.1 while the widget is enabled and reads its standard output: one JSON object per line,
 # written only when something changed.
 #   {"type":"track","title":...,"artist":...,"playing":true,"positionMs":...,"endMs":...,"updatedMs":...}
-#   {"type":"cover","png":"<base64 PNG: the thumbnail's centre square, at most 256x256>"}  (new track; "" without one)
+#   {"type":"cover","png":"<base64 PNG: the thumbnail's centre square, at most 256x256>"}  (new cover; "" for none)
 #   {"type":"none"}                                                                  (nothing playing)
 # It reads nothing but the current media session, writes nothing to disk, and exits when the game process is gone.
 param([Parameter(Mandatory = $true)][int]$ParentPid)
@@ -29,6 +29,9 @@ $inputStreamType = [Windows.Storage.Streams.IInputStream, Windows.Storage.Stream
 $asStreamForRead = [System.IO.WindowsRuntimeStreamExtensions].GetMethod('AsStreamForRead', [Type[]]@($inputStreamType))
 # Browsers hand Windows small thumbnails (YouTube 150x84, Spotify 120x120): never scale one up, only down.
 $maxCoverSize = 256
+# Browsers switch a session's title before its thumbnail (a song ending into the next one): after a new track the
+# cover is read again on this many polls, and sent whenever it differs from the last one sent.
+$coverPolls = 5
 
 function Send([hashtable]$message) {
     [Console]::Out.WriteLine(($message | ConvertTo-Json -Compress))
@@ -66,6 +69,8 @@ function Cover($reference) {
 
 $manager = Await ($managerType::RequestAsync()) $managerType
 $lastTrack = $null
+$lastCover = $null
+$coverPollsLeft = 0
 $lastLine = $null
 while ($null -ne (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) {
     $message = @{ type = 'none' }
@@ -78,7 +83,15 @@ while ($null -ne (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) {
             if ($properties.Title) {
                 $track = "$($session.SourceAppUserModelId)`n$($properties.Title)`n$($properties.Artist)"
                 if ($track -ne $lastTrack) {
-                    Send @{ type = 'cover'; png = (Cover $properties.Thumbnail) }
+                    $coverPollsLeft = $coverPolls
+                }
+                if ($coverPollsLeft -gt 0) {
+                    $coverPollsLeft--
+                    $cover = Cover $properties.Thumbnail
+                    if ($cover -ne $lastCover) {
+                        Send @{ type = 'cover'; png = $cover }
+                        $lastCover = $cover
+                    }
                 }
                 $message = @{
                     type       = 'track'
