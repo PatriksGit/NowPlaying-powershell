@@ -76,3 +76,7 @@ Output: one JSON object per line, only when something changed (`track`, `cover`,
 
 To check that the game runs this exact file, compare `Get-FileHash` of
 `%APPDATA%\.runeempire\game\rune\now-playing.ps1` with this repository's `now-playing.ps1`.
+
+## Licenc / License
+
+MIT, lásd / see [LICENSE](LICENSE).
