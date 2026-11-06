@@ -72,7 +72,9 @@ $lastTrack = $null
 $lastCover = $null
 $coverPollsLeft = 0
 $lastLine = $null
-while ($null -ne (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) {
+# One lookup of the game process: asking it HasExited each poll costs far less than Get-Process, which lists them all.
+$parent = [System.Diagnostics.Process]::GetProcessById($ParentPid)
+while (-not $parent.HasExited) {
     $message = @{ type = 'none' }
     $track = $null
     try {
